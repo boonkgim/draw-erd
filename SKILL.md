@@ -1,6 +1,7 @@
 ---
 name: draw-erd
 description: Draw the entity-relationship diagram for a data model as one self-contained HTML page — every table a box, every foreign key a crow's-foot edge with its cardinality and optionality, collapsing to a keys-only map for reading relationships and expanding to every column, placed beside the data model it renders. Use when the user asks to draw an ERD, diagram the schema, visualise the data model, or "show me the tables and how they relate". It renders an existing data model; it never designs one — that's a design-db skill's job, if you use one, and this only draws it.
+license: MIT
 ---
 
 # draw-erd
