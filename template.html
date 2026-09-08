@@ -27,6 +27,22 @@
   header p { margin: 0; color: var(--muted); font-size: 13px; }
   .wrap { overflow: auto; padding: 16px 24px 32px; }
 
+  /* Toolbar: how many columns every box shows. The picture is the same either way —
+     only how much of each table you are reading changes. */
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+         padding: 12px 24px 0; font-size: 12px; color: var(--muted); }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px;
+         overflow: hidden; background: var(--card); }
+  .seg button {
+    font: inherit; color: var(--fg); background: none; border: 0;
+    border-left: 1px solid var(--border); padding: 5px 10px; cursor: pointer;
+  }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--head); font-weight: 600; }
+  .seg button:hover { background: var(--head); }
+  .bar .mixed { font-style: italic; }
+  .bar .mixed[hidden] { display: none; }
+
   /* Canvas: entities are absolutely positioned; JS draws the edges beneath them. */
   .canvas { position: relative; }
   .edges { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
@@ -45,10 +61,18 @@
     border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow);
     overflow: hidden;
   }
+  /* A table this model does not own: generated elsewhere, drawn only as context. */
+  .entity.boundary { border-style: dashed; }
   .entity > h2 {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
     margin: 0; padding: 7px 10px; font-size: 13px; font-family: ui-monospace, monospace;
     background: var(--head); border-bottom: 1px solid var(--border);
-    border-left: 3px solid var(--group, transparent);
+    border-left: 3px solid var(--group, transparent); cursor: pointer;
+  }
+  .entity > h2:focus-visible { outline: 2px solid var(--key); outline-offset: -2px; }
+  .entity > h2 .ct {
+    font-family: ui-sans-serif, sans-serif; font-size: 10px; font-weight: 400;
+    color: var(--muted); white-space: nowrap;
   }
   .entity ul { margin: 0; padding: 4px 0; list-style: none; }
   .entity li {
@@ -61,6 +85,15 @@
   .entity p { margin: 0; padding: 6px 10px; border-top: 1px dashed var(--border);
               color: var(--muted); font-size: 11px; }
 
+  /* The compact grid: shorter boxes, so a narrower cap and floor keep the map tight. */
+  .canvas.compact .entity { min-width: 150px; max-width: 310px; }
+
+  /* Three levels of detail. data-in marks the least detailed level a row belongs to:
+     k = key (PK, FK, unique — what a relationship is made of), m = the data model's
+     own selection, a = every remaining column of section 4. */
+  .entity[data-lvl="keys"] li:not([data-in="k"]),
+  .entity[data-lvl="model"] li[data-in="a"] { display: none; }
+
   /* Hover: keep one relationship readable in a dense diagram. */
   .canvas.dim .entity:not(.hot) { opacity: .28; }
   .canvas.dim .edge:not(.hot) { opacity: .15; }
@@ -72,6 +105,7 @@
   .legend h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase;
                 letter-spacing: .04em; color: var(--muted); }
   .legend ul { margin: 0; padding-left: 18px; }
+  .legend li { margin: 2px 0; }
   .legend code { font-family: ui-monospace, monospace; }
 </style>
 </head>
@@ -82,28 +116,65 @@
   <p>SOURCE — read the data model, not this file, when the two disagree.</p>
 </header>
 
+<div class="bar">
+  <span id="lvl-label">Columns</span>
+  <span class="seg" role="group" aria-labelledby="lvl-label">
+    <button type="button" data-set="keys" aria-pressed="false">Keys only</button>
+    <button type="button" data-set="model" aria-pressed="true">Data model</button>
+    <button type="button" data-set="all" aria-pressed="false">All columns</button>
+  </span>
+  <span class="mixed" id="mixed" hidden>mixed — some tables set on their own</span>
+  <span>Click a table's name to change just that one · hover it to isolate its relationships</span>
+</div>
+
 <div class="wrap">
   <div class="canvas" id="canvas">
     <svg class="edges" id="edges"></svg>
 
-    <!-- One <article> per table. id="e-<table>". left/top are hand-placed: parents
-         above/left of the tables that reference them. --group tints the header. -->
-    <article class="entity" id="e-parent_table" style="left:40px; top:40px; --group:#7a5af5">
-      <h2>parent_table</h2>
+    <!-- One <article> per table in section 4, id="e-<table>". Two hand-placed grids:
+         left/top is the detail grid, data-compact="x,y" the tighter one used when every box
+         is collapsed — all boxes carry it or none do. --group tints the header.
+
+         Every column of section 4 goes in the box; data-in says the least detailed level it
+         appears at. k = key: the primary key, every foreign key, and every column in a unique,
+         including one that exists only to be half of a composite reference. m = the selection
+         the data model itself makes. a = every remaining column. -->
+    <article class="entity" id="e-parent_table" data-compact="40,40"
+             style="left:40px; top:40px; --group:#7a5af5">
+      <h2 tabindex="0" role="button"><span class="nm">parent_table</span><span class="ct"></span></h2>
       <ul>
-        <li><b>PK</b><span class="n">id</span><span class="t">uuid</span></li>
-        <li><b></b><span class="n">name</span><span class="t">text</span></li>
-        <li class="opt"><b>U</b><span class="n">slug</span><span class="t">text</span></li>
+        <li data-in="k"><b>PK</b><span class="n">id</span><span class="t">uuid v7</span></li>
+        <li data-in="m"><b></b><span class="n">name</span><span class="t">text</span></li>
+        <li data-in="k" class="opt"><b>U</b><span class="n">slug</span><span class="t">text</span></li>
+        <li data-in="a"><b></b><span class="n">created_at</span><span class="t">timestamptz</span></li>
       </ul>
-      <p>+3 more columns</p>
+      <!-- The footer carries constraint notes, never a column count: the count badge in the
+           header does that, and it stays true as the level changes. -->
+      <p>unique (slug)</p>
     </article>
 
-    <article class="entity" id="e-child_table" style="left:360px; top:40px; --group:#0ea5e9">
-      <h2>child_table</h2>
+    <article class="entity" id="e-child_table" data-compact="360,40"
+             style="left:440px; top:40px; --group:#0ea5e9">
+      <h2 tabindex="0" role="button"><span class="nm">child_table</span><span class="ct"></span></h2>
       <ul>
-        <li><b>PK</b><span class="n">id</span><span class="t">uuid</span></li>
-        <li><b>FK</b><span class="n">parent_id</span><span class="t">→ parent_table</span></li>
+        <li data-in="k"><b>PK</b><span class="n">id</span><span class="t">uuid v7</span></li>
+        <li data-in="k"><b>FK</b><span class="n">parent_id</span><span class="t">&rarr; parent_table</span></li>
+        <li data-in="a"><b></b><span class="n">created_at</span><span class="t">timestamptz</span></li>
       </ul>
+    </article>
+
+    <!-- A table this model does not own: its key, what identifies it, and who owns it.
+         class="entity boundary" keeps it out of the `<article class="entity"` count, which
+         must equal the number of tables in section 4. data-nocount drops its column badge,
+         because section 4 does not list its columns. -->
+    <article class="entity boundary" id="e-user" data-compact="780,40" data-nocount
+             style="left:900px; top:40px; --group:#6b7481">
+      <h2 tabindex="0" role="button"><span class="nm">user</span><span class="ct"></span></h2>
+      <ul>
+        <li data-in="k"><b>PK</b><span class="n">id</span><span class="t">text</span></li>
+        <li data-in="k"><b>U</b><span class="n">email</span><span class="t">text</span></li>
+      </ul>
+      <p>Better Auth owns this table — not designed here</p>
     </article>
   </div>
 </div>
@@ -117,12 +188,32 @@
     <li>A dashed line means the child's foreign key is nullable — the relationship is optional.</li>
     <li><code>PK</code> primary key · <code>FK</code> foreign key · <code>U</code> unique ·
         a trailing <code>?</code> on a column name means nullable.</li>
-    <li>Header colour groups tables by subject area; the grouping is also stated in each
-        table's name, so colour is never the only carrier of meaning.</li>
+    <li>A composite foreign key is <em>one</em> edge:
+        the child box lists its columns and the footer names the reference.</li>
+    <li>A dashed <em>box</em> is a table this model does not own. <code>user</code> is drawn
+        because two tables reference it; it is generated by Better Auth.</li>
+    <li>Header colour groups tables by subject area — catalogue, booking and money, credit and
+        cancellation, external — and the grouping is also stated in each table's name, so colour
+        is never the only carrier of meaning.</li>
+    <li><strong>Keys only</strong> leaves each box with what a relationship is made of: its
+        primary key, every foreign key, and every column in a unique — including the ones that
+        only exist to be half of a composite reference — and pulls the diagram onto a tighter grid,
+        because short boxes do not need the room tall ones do. <strong>Data model</strong> is the
+        selection §4 makes; <strong>All columns</strong> is every column §4 lists, and the count
+        beside each table name says which you are reading. Expanding any one table opens the
+        diagram back onto the roomy grid.</li>
+    <li>Both grids put the same tables in the same cells, and every edge keeps the side of the box
+        it leaves from in either one, so the two are the same picture at two sizes rather than two
+        pictures. Nothing is laid out automatically: both grids are placed by hand.</li>
   </ul>
   <h3 style="margin-top:10px">Not shown</h3>
   <ul>
     <li>Anything the data model does not settle. Listed here rather than invented.</li>
+    <li>A self-referencing foreign key, if the model has one: list the column in its box and say
+        so here. The routing connects two boxes, so a self-loop would be a line struck through
+        one.</li>
+    <li>Derived values, columns the model deliberately refuses, check predicates (§6) and
+        indexes (§7).</li>
   </ul>
 </div>
 
@@ -155,10 +246,15 @@ function sides(a, b) {
     : (b.cy >= a.cy ? ['b', 't'] : ['t', 'b']);
 }
 
+// Frozen once by calibrate(), from the geometry with every column showing, so that
+// collapsing a box can never flip an edge onto a different side of it. Edges then
+// slide and stretch as heights change, but the picture keeps its shape.
+let SIDES = null;
+
 function draw() {
   svg.textContent = '';
-  const ends = REL.flatMap(r => {
-    const [sa, sb] = sides(box(r.from), box(r.to));
+  const ends = REL.flatMap((r, i) => {
+    const [sa, sb] = SIDES ? SIDES[i] : sides(box(r.from), box(r.to));
     return [{ r, t: r.from, s: sa }, { r, t: r.to, s: sb }];
   });
   // Spread several edges that leave the same side so they do not stack on one point.
@@ -225,9 +321,110 @@ function draw() {
   canvas.style.height = h + 40 + 'px';
 }
 
-for (const n of canvas.querySelectorAll('.entity')) {
+// ---- Detail level -----------------------------------------------------------
+// Boxes collapse to their keys and expand to every column of section 4. Only the
+// height changes: each box's width is pinned to what it measures with all columns
+// showing, so a hand-placed diagram stays where it was placed. Every change ends
+// in draw(), which re-routes the edges from the boxes' live geometry.
+
+const LEVELS = ['keys', 'model', 'all'];
+const NAMED = { keys: 'keys only', model: 'the data model’s columns', all: 'all columns' };
+const entities = [...canvas.querySelectorAll('.entity')];
+const mixedNote = document.getElementById('mixed');
+
+function label(n) {
+  const total = n.querySelectorAll('li').length;
+  const shown = n.querySelectorAll('li:not([data-in="a"])').length;
+  const keys = n.querySelectorAll('li[data-in="k"]').length;
+  const lvl = n.dataset.lvl;
+  const count = lvl === 'keys' ? keys : lvl === 'model' ? shown : total;
+  n.querySelector('.ct').textContent = n.hasAttribute('data-nocount') ? '' : count + '/' + total;
+  n.querySelector('h2').setAttribute('aria-label',
+    n.querySelector('.nm').textContent + ' — showing ' + NAMED[lvl] +
+    ', click to change how many columns it shows');
+}
+
+function setLevel(n, lvl) { n.dataset.lvl = lvl; label(n); }
+
+function syncBar() {
+  const all = entities.map(n => n.dataset.lvl);
+  const same = all.every(l => l === all[0]) ? all[0] : null;
+  for (const b of document.querySelectorAll('.seg button'))
+    b.setAttribute('aria-pressed', String(b.dataset.set === same));
+  mixedNote.hidden = same !== null;
+}
+
+// Two hand-placed grids, one arrangement. The detail grid has room for every column;
+// the compact grid is the same cells pulled in around collapsed boxes, so the map keeps
+// its shape and loses its whitespace. Collapsing every box is what asks for it.
+const DETAIL = entities.map(n => [n.offsetLeft, n.offsetTop]);
+// All or nothing: a diagram short enough not to need a second grid simply omits
+// data-compact everywhere, and collapsing then narrows the boxes where they stand.
+const COMPACT = entities.every(n => n.dataset.compact)
+  ? entities.map(n => n.dataset.compact.split(',').map(Number))
+  : DETAIL;
+let WIDTH = { detail: [], compact: [] };
+let layout = null;
+
+// One pass per grid, each at the widest level that grid ever shows: pin every box's
+// width there, and freeze the edge sides once, from the detail grid. Frozen sides are
+// what keep the two pictures the same picture — and what stop a collapse re-routing an
+// edge onto another side of a box.
+function calibrate() {
+  const was = entities.map(n => n.dataset.lvl);
+  const place = (xy, lvl, compact) => {
+    canvas.classList.toggle('compact', compact);
+    entities.forEach((n, i) => {
+      n.style.width = ''; n.style.left = xy[i][0] + 'px'; n.style.top = xy[i][1] + 'px';
+      setLevel(n, lvl);   // via setLevel, so the count badge being measured is the real one
+    });
+    return entities.map(n => n.offsetWidth);
+  };
+  WIDTH.compact = place(COMPACT, 'keys', true);
+  WIDTH.detail = place(DETAIL, 'all', false);
+  SIDES = REL.map(r => sides(box(r.from), box(r.to)));
+  layout = null;
+  entities.forEach((n, i) => setLevel(n, was[i]));
+  applyLayout();
+}
+
+// The compact grid is for reading relationships, so it is used exactly when there is
+// nothing but relationships on show. Expanding any one table opens the diagram back up.
+function applyLayout() {
+  const want = entities.every(n => n.dataset.lvl === 'keys') ? 'compact' : 'detail';
+  if (want !== layout) {
+    layout = want;
+    const xy = want === 'compact' ? COMPACT : DETAIL;
+    canvas.classList.toggle('compact', want === 'compact');
+    entities.forEach((n, i) => {
+      n.style.left = xy[i][0] + 'px'; n.style.top = xy[i][1] + 'px';
+      n.style.width = WIDTH[want][i] + 'px';
+    });
+  }
+  draw();
+}
+
+for (const b of document.querySelectorAll('.seg button')) {
+  b.addEventListener('click', () => {
+    for (const n of entities) setLevel(n, b.dataset.set);
+    syncBar(); applyLayout();
+  });
+}
+
+for (const n of entities) {
   const t = n.id.slice(2);
-  n.addEventListener('mouseenter', () => {
+  const h = n.querySelector('h2');
+  const cycle = () => {
+    setLevel(n, LEVELS[(LEVELS.indexOf(n.dataset.lvl) + 1) % LEVELS.length]);
+    syncBar(); applyLayout();
+  };
+  h.addEventListener('click', cycle);
+  h.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cycle(); }
+  });
+
+  // Hover or focus: keep one relationship readable in a dense diagram.
+  const lit = () => {
     canvas.classList.add('dim');
     n.classList.add('hot');
     for (const g of svg.querySelectorAll('.edge')) {
@@ -238,16 +435,22 @@ for (const n of canvas.querySelectorAll('.entity')) {
         node(to).classList.add('hot');
       }
     }
-  });
-  n.addEventListener('mouseleave', () => {
+  };
+  const unlit = () => {
     canvas.classList.remove('dim');
     for (const e of canvas.querySelectorAll('.hot')) e.classList.remove('hot');
-  });
+  };
+  n.addEventListener('mouseenter', lit);
+  n.addEventListener('mouseleave', unlit);
+  h.addEventListener('focus', lit);
+  h.addEventListener('blur', unlit);
 }
 
-draw();
+for (const n of entities) setLevel(n, 'model');
+syncBar();
+calibrate();
 addEventListener('resize', draw);
-if (document.fonts) document.fonts.ready.then(draw);
+if (document.fonts) document.fonts.ready.then(calibrate);
 </script>
 </body>
 </html>
