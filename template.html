@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ERD — TITLE</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --fg: #14181d; --muted: #6b7481; --line: #98a2b3;
+    --card: #ffffff; --border: #d7dce3; --head: #eef1f5; --key: #7a5af5;
+    --shadow: 0 1px 2px rgb(16 24 40 / .06), 0 1px 3px rgb(16 24 40 / .10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1216; --fg: #e6e9ee; --muted: #949cab; --line: #6b7481;
+      --card: #171b21; --border: #2a3039; --head: #1e242c; --key: #a78bfa;
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.45 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header { padding: 24px 24px 8px; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: var(--muted); font-size: 13px; }
+  .wrap { overflow: auto; padding: 16px 24px 32px; }
+
+  /* Canvas: entities are absolutely positioned; JS draws the edges beneath them. */
+  .canvas { position: relative; }
+  .edges { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+  .edge polyline { fill: none; stroke: var(--line); stroke-width: 1.5; }
+  .edge path { fill: none; stroke: var(--line); stroke-width: 1.5; }
+  .edge circle { fill: var(--bg); stroke: var(--line); stroke-width: 1.5; }
+  .edge.optional polyline { stroke-dasharray: 5 4; }
+  .edge text {
+    fill: var(--muted); font-size: 11px; text-anchor: middle;
+    paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round;
+  }
+
+  .entity {
+    position: absolute; width: max-content; min-width: 210px; max-width: 330px;
+    background: var(--card);
+    border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .entity > h2 {
+    margin: 0; padding: 7px 10px; font-size: 13px; font-family: ui-monospace, monospace;
+    background: var(--head); border-bottom: 1px solid var(--border);
+    border-left: 3px solid var(--group, transparent);
+  }
+  .entity ul { margin: 0; padding: 4px 0; list-style: none; }
+  .entity li {
+    display: grid; grid-template-columns: 30px 1fr auto; gap: 6px; align-items: baseline;
+    padding: 2px 10px; font-family: ui-monospace, monospace; font-size: 12px;
+  }
+  .entity li b { color: var(--key); font-size: 10px; font-weight: 700; }
+  .entity li .t { color: var(--muted); font-size: 11px; }
+  .entity li.opt .n::after { content: "?"; color: var(--muted); }
+  .entity p { margin: 0; padding: 6px 10px; border-top: 1px dashed var(--border);
+              color: var(--muted); font-size: 11px; }
+
+  /* Hover: keep one relationship readable in a dense diagram. */
+  .canvas.dim .entity:not(.hot) { opacity: .28; }
+  .canvas.dim .edge:not(.hot) { opacity: .15; }
+
+  .legend {
+    margin: 24px; padding: 12px 16px; border: 1px solid var(--border);
+    border-radius: 8px; background: var(--card); font-size: 12px; max-width: 900px;
+  }
+  .legend h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase;
+                letter-spacing: .04em; color: var(--muted); }
+  .legend ul { margin: 0; padding-left: 18px; }
+  .legend code { font-family: ui-monospace, monospace; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>TITLE</h1>
+  <p>SOURCE — read the data model, not this file, when the two disagree.</p>
+</header>
+
+<div class="wrap">
+  <div class="canvas" id="canvas">
+    <svg class="edges" id="edges"></svg>
+
+    <!-- One <article> per table. id="e-<table>". left/top are hand-placed: parents
+         above/left of the tables that reference them. --group tints the header. -->
+    <article class="entity" id="e-parent_table" style="left:40px; top:40px; --group:#7a5af5">
+      <h2>parent_table</h2>
+      <ul>
+        <li><b>PK</b><span class="n">id</span><span class="t">uuid</span></li>
+        <li><b></b><span class="n">name</span><span class="t">text</span></li>
+        <li class="opt"><b>U</b><span class="n">slug</span><span class="t">text</span></li>
+      </ul>
+      <p>+3 more columns</p>
+    </article>
+
+    <article class="entity" id="e-child_table" style="left:360px; top:40px; --group:#0ea5e9">
+      <h2>child_table</h2>
+      <ul>
+        <li><b>PK</b><span class="n">id</span><span class="t">uuid</span></li>
+        <li><b>FK</b><span class="n">parent_id</span><span class="t">→ parent_table</span></li>
+      </ul>
+    </article>
+  </div>
+</div>
+
+<div class="legend">
+  <h3>Notation</h3>
+  <ul>
+    <li>Crow's foot at the <em>many</em> end. <code>||</code> exactly one ·
+        <code>o|</code> zero or one · <code>o&lt;</code> zero or many ·
+        <code>|&lt;</code> one or many.</li>
+    <li>A dashed line means the child's foreign key is nullable — the relationship is optional.</li>
+    <li><code>PK</code> primary key · <code>FK</code> foreign key · <code>U</code> unique ·
+        a trailing <code>?</code> on a column name means nullable.</li>
+    <li>Header colour groups tables by subject area; the grouping is also stated in each
+        table's name, so colour is never the only carrier of meaning.</li>
+  </ul>
+  <h3 style="margin-top:10px">Not shown</h3>
+  <ul>
+    <li>Anything the data model does not settle. Listed here rather than invented.</li>
+  </ul>
+</div>
+
+<script>
+// Relationships. from = the "one" side (parent), to = the "many" side (child).
+// card: '1' | '0..1' | '*' | '1..*'   optional: the FK is nullable.
+const REL = [
+  { from: 'parent_table', to: 'child_table', fromCard: '1', toCard: '*',
+    label: 'has', optional: false },
+];
+
+const canvas = document.getElementById('canvas');
+const svg = document.getElementById('edges');
+const NS = 'http://www.w3.org/2000/svg';
+const node = t => document.getElementById('e-' + t);
+const mk = (n, a) => { const e = document.createElementNS(NS, n);
+  for (const k in a) e.setAttribute(k, a[k]); return e; };
+
+function box(t) {
+  const n = node(t);
+  if (!n) throw new Error('no entity box for ' + t);
+  return { x: n.offsetLeft, y: n.offsetTop, w: n.offsetWidth, h: n.offsetHeight,
+           cx: n.offsetLeft + n.offsetWidth / 2, cy: n.offsetTop + n.offsetHeight / 2 };
+}
+
+// Which side each end leaves from, chosen by the dominant separation.
+function sides(a, b) {
+  return Math.abs(b.cx - a.cx) >= Math.abs(b.cy - a.cy)
+    ? (b.cx >= a.cx ? ['r', 'l'] : ['l', 'r'])
+    : (b.cy >= a.cy ? ['b', 't'] : ['t', 'b']);
+}
+
+function draw() {
+  svg.textContent = '';
+  const ends = REL.flatMap(r => {
+    const [sa, sb] = sides(box(r.from), box(r.to));
+    return [{ r, t: r.from, s: sa }, { r, t: r.to, s: sb }];
+  });
+  // Spread several edges that leave the same side so they do not stack on one point.
+  const slots = new Map();
+  for (const e of ends) {
+    const k = e.t + e.s;
+    if (!slots.has(k)) slots.set(k, []);
+    e.i = slots.get(k).push(e) - 1;
+  }
+  const anchor = e => {
+    const b = box(e.t), n = slots.get(e.t + e.s).length, f = (e.i + 1) / (n + 1);
+    if (e.s === 'l') return { x: b.x, y: b.y + b.h * f, dx: -1, dy: 0 };
+    if (e.s === 'r') return { x: b.x + b.w, y: b.y + b.h * f, dx: 1, dy: 0 };
+    if (e.s === 't') return { x: b.x + b.w * f, y: b.y, dx: 0, dy: -1 };
+    return { x: b.x + b.w * f, y: b.y + b.h, dx: 0, dy: 1 };
+  };
+
+  // Crow's-foot glyphs, drawn at the box edge pointing back along the line.
+  function glyph(g, p, card) {
+    const px = -p.dy, py = p.dx;                       // perpendicular to the line
+    const tip = k => `M ${p.x + p.dx * k} ${p.y + p.dy * k}`;
+    if (card === '*' || card === '1..*') {
+      const ax = p.x + p.dx * 14, ay = p.y + p.dy * 14;
+      g.append(mk('path', { d: `M ${ax} ${ay} L ${p.x} ${p.y}
+        M ${ax} ${ay} L ${p.x + px * 7} ${p.y + py * 7}
+        M ${ax} ${ay} L ${p.x - px * 7} ${p.y - py * 7}` }));
+    }
+    const bar = k => g.append(mk('path', { d: `${tip(k)}
+      l ${px * 6} ${py * 6} m ${-px * 12} ${-py * 12} l ${px * 6} ${py * 6}` }));
+    if (card === '1') { bar(9); bar(17); }
+    if (card === '0..1') { bar(9); g.append(mk('circle',
+      { cx: p.x + p.dx * 22, cy: p.y + p.dy * 22, r: 4 })); }
+    if (card === '1..*') bar(21);
+    if (card === '*') g.append(mk('circle',
+      { cx: p.x + p.dx * 22, cy: p.y + p.dy * 22, r: 4 }));
+  }
+
+  for (let i = 0; i < REL.length; i++) {
+    const r = REL[i];
+    const a = anchor(ends[i * 2]), b = anchor(ends[i * 2 + 1]);
+    const pts = a.dx
+      ? [[a.x, a.y], [(a.x + b.x) / 2, a.y], [(a.x + b.x) / 2, b.y], [b.x, b.y]]
+      : [[a.x, a.y], [a.x, (a.y + b.y) / 2], [b.x, (a.y + b.y) / 2], [b.x, b.y]];
+    const g = mk('g', { class: 'edge' + (r.optional ? ' optional' : '') });
+    g.dataset.from = r.from; g.dataset.to = r.to;
+    g.append(mk('polyline', { points: pts.map(p => p.join(',')).join(' ') }));
+    glyph(g, a, r.fromCard); glyph(g, b, r.toCard);
+    if (r.label) {
+      const t = mk('text', { x: (pts[1][0] + pts[2][0]) / 2,
+                             y: (pts[1][1] + pts[2][1]) / 2 - 5 });
+      t.textContent = r.label;
+      g.append(t);
+    }
+    svg.append(g);
+  }
+
+  // Size the canvas to its contents so the page scrolls instead of clipping.
+  let w = 0, h = 0;
+  for (const n of canvas.querySelectorAll('.entity')) {
+    w = Math.max(w, n.offsetLeft + n.offsetWidth);
+    h = Math.max(h, n.offsetTop + n.offsetHeight);
+  }
+  canvas.style.width = w + 40 + 'px';
+  canvas.style.height = h + 40 + 'px';
+}
+
+for (const n of canvas.querySelectorAll('.entity')) {
+  const t = n.id.slice(2);
+  n.addEventListener('mouseenter', () => {
+    canvas.classList.add('dim');
+    n.classList.add('hot');
+    for (const g of svg.querySelectorAll('.edge')) {
+      const { from, to } = g.dataset;
+      if (from === t || to === t) {
+        g.classList.add('hot');
+        node(from).classList.add('hot');
+        node(to).classList.add('hot');
+      }
+    }
+  });
+  n.addEventListener('mouseleave', () => {
+    canvas.classList.remove('dim');
+    for (const e of canvas.querySelectorAll('.hot')) e.classList.remove('hot');
+  });
+}
+
+draw();
+addEventListener('resize', draw);
+if (document.fonts) document.fonts.ready.then(draw);
+</script>
+</body>
+</html>
