@@ -44,6 +44,14 @@ tighter grid. Two invariants make that safe, and both must survive any edit:
   never flips one onto a different side. `sides()` picks by centre separation; unfrozen, a box
   shrinking re-routes edges that were verified in some other state, and a lane that cleared a
   box by a pixel stops clearing it.
+- **Edges leaving one side toward one column all bend at the same x, and that is fine.** The
+  bend is the midpoint between the two boxes, so a column of boxes with a shared left edge
+  gives every one of those edges the same lane. They do not stack, because the slots run down
+  the hub's side in `REL` order: order them to match the rows they reach and the top edge
+  sweeps up, the bottom edge sweeps down, and the one on the hub's own row is a stub between
+  them. **This is the note to re-read before you move a box off the lattice to "avoid a
+  collision".** You are not avoiding one; `verify.js` flags a genuine two-edges-on-one-line
+  overlap, and if it is silent there is nothing to dodge.
 
 ## Procedure
 
@@ -54,21 +62,42 @@ tighter grid. Two invariants make that safe, and both must survive any edit:
    tie-breaker inside it, not the rule: a hub table with five children, or an external table
    referenced from opposite corners, will defeat "above and left". Place it where its edges are
    clean and say in your report that you did.
-3. Place the detail grid — hand-written `left`/`top` px on each `<article>`. Column pitch is the
-   widest box in that column plus a gutter, and **the gutter must be wider than the longest edge
-   label crossing it**: a connector bends at the midpoint between its two boxes, so every lane
-   lands in a gutter and every label is centred on one.
-4. Put every column of section 4 in its box, each `<li>` marked `data-in`: `k` for the primary
+3. **Assign each box a cell — a column index and a row index — and place the hub's partners by
+   compass direction, not just by adjacency.** `sides()` sends an edge out of the side whose
+   centre separation dominates, so a partner directly above leaves the top, one directly left
+   leaves the left, and a *diagonal* partner leaves whichever axis is longer. That is the lever
+   for spreading a hub's edges: a table with six relationships should have them leaving on all
+   four sides, not fanned out of one. Put the hub's own parent in the row above and it lands on
+   the top; put a child in the row below and to the side and it lands on the side. Then read
+   the assignment back off the page (`SIDES` after `calibrate()`) rather than assuming it — a
+   diagonal decided by a 30px margin is a decision, and it should be one you made.
+4. **Place both grids as a lattice: one x per column, one y per row, and every box on an
+   intersection.** Pick the column x from the widest box in that column plus a gutter, and the
+   row y from the tallest box in that row plus a gutter, so the gutters are near-constant even
+   though the pitch is not. **The gutter must be wider than the longest edge label crossing it,
+   with room to spare** — a connector bends at the midpoint between its two boxes, so every lane
+   lands in a gutter and every label is centred on one; a label filling more than half its
+   gutter reads as cramped even when nothing collides. **Never nudge one box off the lattice.**
+   The temptation is real — see the coincident-bend note below — and it is always the wrong fix:
+   a single off-grid box is the difference between a diagram that reads as rows and columns and
+   one that reads as scatter.
+5. Put every column of section 4 in its box, each `<li>` marked `data-in`: `k` for the primary
    key, every foreign key and every column in a unique; `m` for the rest of what the data model
    itself puts forward; `a` for everything else.
-5. Write one `REL` entry per foreign key — cardinality rule below, self-references excepted.
-6. Place the compact grid in `data-compact` when the detail grid runs more than two rows deep;
+6. Write one `REL` entry per foreign key — cardinality rule below, self-references excepted —
+   and **order the array so that, on every side that carries more than one edge, the slots run
+   in the same top-to-bottom (or left-to-right) order as the boxes they reach.** `draw()` hands
+   out slots in `REL` order, so this is the only control you have over which edge sits where on
+   a crowded side, and getting it right is what makes the next note true.
+7. Place the compact grid in `data-compact` when the detail grid runs more than two rows deep;
    shallower than that there is no whitespace to reclaim, and leaving `data-compact` off every
    box is the supported way to skip it. Same tables in the same cells — collapsing should
    tighten the picture, not redraw it — with the pitch taken from the collapsed sizes. Measure
-   the narrowest `.canvas.compact .entity` max-width that makes nothing wrap or clip. Do not
-   guess it: at 280px this diagram silently rendered `enum` as `enu`.
-7. Run `verify.js`, fix what it reports by moving boxes, and then look at the page in a
+   the narrowest `.canvas.compact .entity` max-width that makes nothing wrap or clip, measured
+   against the widest row any box still shows at `keys` level — usually a long foreign-key or
+   composite-key column name. Do not guess it: an overtight cap drops the end of a type or a
+   name silently, and a name that lost its last characters is a wrong name, not a short one.
+8. Run `verify.js`, fix what it reports by moving boxes, and then look at the page in a
    browser — in both grids.
 
 ## Do
@@ -113,13 +142,34 @@ tighter grid. Two invariants make that safe, and both must survive any edit:
 - **Don't auto-layout.** A hand-placed diagram is stable across redraws — the same model
   produces the same picture, and a diff is readable. Both grids are placed by hand, for the same
   reason. Force-directed output is different every run and never groups by meaning.
+- **Don't let hand-placed become free-placed.** Every box on a column x and a row y: the number
+  of distinct `left` values is the number of columns, and one more than that means one box is
+  sitting between two of them. `failures: []` does not mean the layout is good — the sweep
+  checks that nothing collides, not that anything lines up, and the two are easy to confuse
+  when a nudged box has just made the sweep pass.
 - **Don't draw derived values or "deliberately absent" columns.** `ends_at`, `seats_remaining`
   and a `status` column that the model rejected are not in the database; putting them in a box
   is how they get built.
 - **Don't carry meaning in colour alone.** Header tint groups a subject area, and the grouping
   must also be legible from the names and the legend.
 - **Don't let a line pass under a box, and don't let a name wrap or clip.** Move the box, or
-  widen the cap. A truncated column name is not a summary; it is a wrong name.
+  shorten the label, or — last — widen the cap. A truncated column name is not a summary; it is
+  a wrong name. Two traps sit under this one, and both are silent:
+  - **Any type containing a space wraps inside a box that is wide enough for it.** The row is a
+    grid of `30px 1fr auto`; the `1fr` name column takes the slack and squeezes the type column,
+    so a type like `→ parent_table`, `uuid v7` or `enum{a, b}` breaks over two lines while the
+    box itself measures a comfortable fit. Write every `.t` value with `&nbsp;` in place of its
+    spaces — `&rarr;&nbsp;parent_table`, `uuid&nbsp;v7` — and the type becomes one atom the box
+    must size around. Do it in the `.t` spans only; footers should still wrap.
+  - **The footer sets the box's width.** `width: max-content` takes the widest child, and a
+    long `<p>` is wider than any row, so a two-line constraint note silently pushes the box to
+    the cap. Keep footers short, or accept the cap deliberately for the one or two boxes whose
+    references genuinely need spelling out.
+- **Prefer a shorter honest label to a wider cap.** One over-long row is usually one label that
+  could be shorter without saying less — a self-reference written `→ self` rather than repeating
+  the table's own name, a value list moved out of the type cell and into the footer. Raising the
+  cap for it widens every box already at the cap, and the canvas with them, and it turns a
+  coordinate fix into a CSS fix. Widen the cap only when no honest label fits.
 - **Don't verify the state you happen to be looking at.** Eleven boxes at three levels is
   thousands of geometries, and the one that breaks is not the one on screen. Sweep them.
 - **Don't restate the invariants.** The check predicates, the enforcement ladder and the
@@ -150,4 +200,15 @@ of each other, edges under boxes, labels over boxes, two edges drawn along one l
 name that wrapped or clipped. `failures: []` is the only passing result.
 
 Report the counts, both canvas sizes, how many states were swept, and anything the data model
-left ambiguous.
+left ambiguous. Report the layout as a lattice too — how many distinct column x values and row y
+values the boxes occupy. **If those two numbers are larger than the number of columns and rows
+you meant to draw, a box is off the grid**, and no amount of `failures: []` makes that the
+picture you wanted:
+
+```bash
+grep -o 'style="left:[0-9]*px' docs/<folder>/NN-erd.html | sort -u | wc -l   # == columns
+grep -o 'px; top:[0-9]*px'     docs/<folder>/NN-erd.html | sort -u | wc -l   # == rows
+```
+
+Anchor them like that: a bare `top:[0-9]*px` also matches the legend's inline `margin-top`, and
+a lattice that looks one row too tall is a scare, not a finding.
