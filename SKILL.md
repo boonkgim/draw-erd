@@ -1,6 +1,6 @@
 ---
 name: draw-erd
-description: Draw the entity-relationship diagram for a nanostore data model as one self-contained HTML page — every table a box, every foreign key a crow's-foot edge with its cardinality and optionality, collapsing to a keys-only map for reading relationships and expanding to every column, placed beside the data model it renders. Use when the user asks to draw an ERD, diagram the schema, visualise the data model, or "show me the tables and how they relate". It renders an existing data model; it never designs one — `design-db` decides what is true, and this only draws it.
+description: Draw the entity-relationship diagram for a data model as one self-contained HTML page — every table a box, every foreign key a crow's-foot edge with its cardinality and optionality, collapsing to a keys-only map for reading relationships and expanding to every column, placed beside the data model it renders. Use when the user asks to draw an ERD, diagram the schema, visualise the data model, or "show me the tables and how they relate". It renders an existing data model; it never designs one — that's a design-db skill's job, if you use one, and this only draws it.
 ---
 
 # draw-erd
@@ -13,18 +13,18 @@ redrawn — never patched to say something the document does not.
 
 The newest dated folder under `docs/` — its `NN-data-model.md`, section **4. Tables** for the
 boxes and section **5. Decisions** (the cardinality decision, usually `DM-9`) for the edges.
-Never `docs/2026-08-08-setup`; that is the scaffold's plan of record and `pnpm docs:check`
-compares it against the working tree.
+Never a folder some other tool already owns and diffs against — a docs-consistency script would
+read a dropped-in file as drift.
 
-If the user names a different folder or asks for the live schema instead, read
-`packages/db/src/schema.ts`. If neither exists, stop and say so — do not draw from the PRD.
+If the user names a different folder or asks for the live schema instead, read the project's
+existing schema file. If neither exists, stop and say so — do not draw from the PRD.
 
 ## Output
 
 `docs/<same-folder>/NN-erd.html`, at the next free number, following the same folder rule as
 `design-db`: **a new number is for new material, a correction goes back into the file it
-corrects.** Redrawing the same model overwrites the same file. Do not commit — the user or the
-`feature` skill decides that.
+corrects.** Redrawing the same model overwrites the same file. Do not commit — that decision
+belongs to whoever owns the run.
 
 Copy `.claude/skills/draw-erd/template.html` and fill in four things: the `<article
 class="entity">` boxes — every column marked by the level it belongs to, every foreign key
@@ -196,8 +196,8 @@ tighter grid. Two invariants make that safe, and both must survive any edit:
   a thing the model does not settle.
 - **Use the document's semantic types** — `uuid v7`, `int minor`, `timestamptz` — not DDL you
   invented for the picture.
-- **Label each relationship with a verb read in one direction**: `workshop —is run as→
-  workshop_run`. If no verb fits, the edge is probably two edges.
+- **Label each relationship with a verb read in one direction**: `parent_table —is billed to→
+  child_table`. If no verb fits, the edge is probably two edges.
 - **Draw a composite foreign key as one edge**, its columns as separate rows in the child box and
   the reference named in the footer. It is one reference; two lines would imply two.
 - **List a self-reference; do not draw it.** A foreign key to its own table has no second box to
@@ -205,8 +205,8 @@ tighter grid. Two invariants make that safe, and both must survive any edit:
   it in `Not shown`, and say why the edge count is one short of the foreign-key count.
 - **Show generated or external tables as boundary boxes** — `class="entity boundary"`, which
   keeps them out of the `<article class="entity"` count, plus `data-nocount` because section 4
-  does not list their columns. `user` gets its key, its email, and a footer saying Better Auth
-  owns it. They are context, not content.
+  does not list their columns. `user` gets its key, its email, and a footer saying an auth
+  library owns it. They are context, not content.
 - **Keep the file self-contained.** No CDN, no web font, no fetch. It must open from `file://`
   on a laptop with no network in five years.
 
@@ -268,8 +268,8 @@ tighter grid. Two invariants make that safe, and both must survive any edit:
 - **Don't restate the invariants.** The check predicates, the enforcement ladder and the
   reasoning live in the data model; a diagram that tries to hold them becomes unreadable and
   stale at the same time.
-- **Don't write it into `docs/2026-08-08-setup`**, and don't hand-edit a generated file to make
-  the picture true.
+- **Don't write it into a folder some other tool already owns and diffs against**, and don't
+  hand-edit a generated file to make the picture true.
 
 ## Verify
 
