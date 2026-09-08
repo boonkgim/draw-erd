@@ -4,9 +4,11 @@
 // Two kinds of finding, and they are not the same kind of thing:
 //
 //   failures  — the page is WRONG. Boxes on top of each other, an edge under a box, a label
-//               over a box, two edges along one line, a name wrapped or clipped. Every one is
-//               a defect to fix by MOVING A BOX, never by editing the router. `failures: []`
-//               is the only passing result.
+//               over a box, a name wrapped or clipped, a key gutter overflowing its 30px track,
+//               a role badge outside the closed vocabulary, a foreign key with no referential
+//               action. Every geometric one is a defect to fix by MOVING A BOX, never by
+//               editing the router; the notation ones are fixed in the markup.
+//               `failures: []` is the only passing result.
 //   warnings  — the page is LEGAL but may read badly. A leaf that opened a column of its own,
 //               a hub fanning its edges out of one side, a label filling its gutter. Each is a
 //               judgement, not a defect: fix it, or keep it and say in the report that you
@@ -50,7 +52,7 @@ function verifyErd({ mixes = 1000, seed = 20260818 } = {}) {
       for (const li of n.querySelectorAll('li')) {
         if (li.offsetParent === null) continue;
         if (li.offsetHeight > 24) bad.push(`WRAP ${n.id.slice(2)} ${li.textContent.trim()}`);
-        for (const sp of li.querySelectorAll('.n, .t'))
+        for (const sp of li.querySelectorAll('b, .n, .t'))
           if (sp.scrollWidth > sp.clientWidth + 1)
             bad.push(`CLIP ${n.id.slice(2)} ${sp.textContent}`);
       }
@@ -210,6 +212,28 @@ function verifyErd({ mixes = 1000, seed = 20260818 } = {}) {
     return { warn, columns, rows };
   }
 
+  // The marks that are not geometry. Both are views of the document, so this checks only
+  // what a machine can: that the vocabulary is closed, that a boundary box says so, and that
+  // no foreign key is left without its referential action. Whether the badge is on the right
+  // table is §4 and §9's answer, and nothing here can tell you that.
+  function notation() {
+    const bad = [], ROLES = ['contended', 'ledger', 'external'];
+    for (const n of ents) {
+      const id = n.id.slice(2), roles = [...n.querySelectorAll('h2 .rb')].map(b => b.textContent.trim());
+      for (const r of roles)
+        if (!ROLES.includes(r)) bad.push(`BADGE ${id} "${r}" is not in {${ROLES}}`);
+      const boundary = n.classList.contains('boundary');
+      if (boundary && !roles.includes('external')) bad.push(`BADGE ${id} is a boundary box with no external badge`);
+      if (!boundary && roles.includes('external')) bad.push(`BADGE ${id} is not a boundary box but says external`);
+      for (const b of n.querySelectorAll('li b')) {
+        const t = b.textContent.trim();
+        if (t.startsWith('FK') && !/^FK\u00b7[A-Z]$/.test(t))
+          bad.push(`RULE ${id} "${t}" carries no referential action`);
+      }
+    }
+    return bad;
+  }
+
   const set = st => { ents.forEach((n, i) => setLevel(n, st[i])); applyLayout(); };
   const failures = [], sizes = {};
   const run = (name, st) => {
@@ -242,6 +266,9 @@ function verifyErd({ mixes = 1000, seed = 20260818 } = {}) {
   const detail = composition('detail');
   set(ents.map(() => 'keys'));
   const compact = composition('compact');
+
+  const marks = notation();
+  if (marks.length) failures.push(`notation :: ${marks.join(' | ')}`);
 
   set(entry);
   const statesTested = 3 + 3 * ents.length * 3 + mixes;

@@ -72,14 +72,27 @@
   .entity > h2:focus-visible { outline: 2px solid var(--key); outline-offset: -2px; }
   .entity > h2 .ct {
     font-family: ui-sans-serif, sans-serif; font-size: 10px; font-weight: 400;
-    color: var(--muted); white-space: nowrap;
+    color: var(--muted); white-space: nowrap; margin-left: auto;
+  }
+  /* The role badge: the one thing about a table its columns cannot show. Text, never colour,
+     from a closed vocabulary — contended, ledger, external — and always a view of the data
+     model: §9's contention table and §4's append-only rule decide it, not how hot a table
+     looks. margin-left:auto on .ct keeps the count on the right whatever sits before it. */
+  .entity > h2 .rb {
+    font-family: ui-sans-serif, sans-serif; font-size: 9px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
+    color: var(--muted); background: var(--bg);
+    border: 1px solid var(--border); border-radius: 3px;
+    padding: 0 4px; line-height: 1.45;
   }
   .entity ul { margin: 0; padding: 4px 0; list-style: none; }
   .entity li {
     display: grid; grid-template-columns: 30px 1fr auto; gap: 6px; align-items: baseline;
     padding: 2px 10px; font-family: ui-monospace, monospace; font-size: 12px;
   }
-  .entity li b { color: var(--key); font-size: 10px; font-weight: 700; }
+  /* The key gutter is a fixed 30px track and it carries the delete rule too — FK&middot;R,
+     FK&middot;C — so it must never wrap. Four monospace characters at 10px fit; five do not. */
+  .entity li b { color: var(--key); font-size: 10px; font-weight: 700; white-space: nowrap; }
   .entity li .t { color: var(--muted); font-size: 11px; }
   .entity li.opt .n::after { content: "?"; color: var(--muted); }
   .entity p { margin: 0; padding: 6px 10px; border-top: 1px dashed var(--border);
@@ -138,10 +151,20 @@
          Every column of section 4 goes in the box; data-in says the least detailed level it
          appears at. k = key: the primary key, every foreign key, and every column in a unique,
          including one that exists only to be half of a composite reference. m = the selection
-         the data model itself makes. a = every remaining column. -->
+         the data model itself makes. a = every remaining column.
+
+         Two marks are views of the document and are filled in from it, never inferred:
+         the gutter carries §4's referential action after every FK — FK&middot;R for RESTRICT,
+         FK&middot;C for CASCADE, one per foreign-key column including both halves of a
+         composite — and <span class="rb"> in the header carries the table's role, from a
+         vocabulary closed to contended (a row §9's contention table names as a serialisation
+         point), ledger (a table §4 makes append-only) and external (a boundary box). A table
+         the document marks in none of those ways gets no badge. -->
     <article class="entity" id="e-parent_table" data-compact="40,40"
              style="left:40px; top:40px; --group:#7a5af5">
-      <h2 tabindex="0" role="button"><span class="nm">parent_table</span><span class="ct"></span></h2>
+      <!-- The badge only if §9's contention table names this row. Delete it otherwise: it is
+           a view of the document, not a guess about which table looks hot. -->
+      <h2 tabindex="0" role="button"><span class="nm">parent_table</span><span class="rb">contended</span><span class="ct"></span></h2>
       <ul>
         <li data-in="k"><b>PK</b><span class="n">id</span><span class="t">uuid v7</span></li>
         <li data-in="m"><b></b><span class="n">name</span><span class="t">text</span></li>
@@ -158,9 +181,12 @@
       <h2 tabindex="0" role="button"><span class="nm">child_table</span><span class="ct"></span></h2>
       <ul>
         <li data-in="k"><b>PK</b><span class="n">id</span><span class="t">uuid v7</span></li>
-        <li data-in="k"><b>FK</b><span class="n">parent_id</span><span class="t">&rarr; parent_table</span></li>
+        <li data-in="k"><b>FK&middot;C</b><span class="n">parent_id</span><span class="t">&rarr; parent_table</span></li>
         <li data-in="a"><b></b><span class="n">created_at</span><span class="t">timestamptz</span></li>
       </ul>
+      <!-- An append-only table says what is computed from its rows instead of stored beside
+           them. Keep it to one short line: the footer is what sets the box's width. -->
+      <p>append-only · a balance is a sum of rows, never a column</p>
     </article>
 
     <!-- A table this model does not own: its key, what identifies it, and who owns it.
@@ -169,7 +195,7 @@
          because section 4 does not list its columns. -->
     <article class="entity boundary" id="e-user" data-compact="780,40" data-nocount
              style="left:900px; top:40px; --group:#6b7481">
-      <h2 tabindex="0" role="button"><span class="nm">user</span><span class="ct"></span></h2>
+      <h2 tabindex="0" role="button"><span class="nm">user</span><span class="rb">external</span><span class="ct"></span></h2>
       <ul>
         <li data-in="k"><b>PK</b><span class="n">id</span><span class="t">text</span></li>
         <li data-in="k"><b>U</b><span class="n">email</span><span class="t">text</span></li>
@@ -188,6 +214,24 @@
     <li>A dashed line means the child's foreign key is nullable — the relationship is optional.</li>
     <li><code>PK</code> primary key · <code>FK</code> foreign key · <code>U</code> unique ·
         a trailing <code>?</code> on a column name means nullable.</li>
+    <li><strong>The letter after a foreign key is what happens on delete</strong> — §4's
+        referential action, in the gutter rather than in the crow's foot, which has no notation
+        for it. <code>FK·R</code> is <code>RESTRICT</code>: the parent row cannot be deleted
+        while this one points at it. <code>FK·C</code> is <code>CASCADE</code>: deleting the
+        parent deletes this row. One per foreign-key column, so the number of marks is larger
+        than the number of foreign keys wherever a composite spends two columns on one
+        reference, and larger again than the number of edges wherever a self-reference is
+        listed rather than drawn — say all three counts here, because they differ.</li>
+    <li><strong>A badge beside a table's name</strong> says the one thing about that table its
+        columns cannot show, from a vocabulary closed to three.
+        <code>contended</code> — §9's contention table names this row as a serialisation point,
+        held under <code>SELECT … FOR UPDATE</code> for the read and the insert that depend on
+        it. <code>ledger</code> — §4 rejects every update and delete on the table, so what a
+        reader would look for as a column is a sum over its rows, and its footer says so.
+        <code>external</code> — a table this model does not own.
+        The badge is text, never colour, and it is a view of the document like every other mark
+        here: a table §4 and §9 say none of those things about carries no badge, however busy it
+        looks.</li>
     <li>A composite foreign key is <em>one</em> edge:
         the child box lists its columns and the footer names the reference.</li>
     <li>A dashed <em>box</em> is a table this model does not own. <code>user</code> is drawn
@@ -214,7 +258,12 @@
         so here. The routing connects two boxes, so a self-loop would be a line struck through
         one.</li>
     <li>Derived values, columns the model deliberately refuses, check predicates (§6) and
-        indexes (§7).</li>
+        indexes (§7). A balance the model derives rather than stores is <em>not</em> listed here:
+        its <code>ledger</code> box states it positively in its own footer, where it reads as a
+        design rather than as an omission.</li>
+    <li>Which referential actions can ever fire. The rules themselves are on the canvas beside
+        every foreign key — see <code>FK·R</code> and <code>FK·C</code> above — but whether
+        anything ever deletes such a parent row is a property of the write paths, not of §4.</li>
   </ul>
 </div>
 

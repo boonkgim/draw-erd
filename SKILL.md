@@ -27,8 +27,10 @@ corrects.** Redrawing the same model overwrites the same file. Do not commit —
 `feature` skill decides that.
 
 Copy `.claude/skills/draw-erd/template.html` and fill in four things: the `<article
-class="entity">` boxes with every column marked by the level it belongs to, the `REL` array,
-the second set of coordinates in `data-compact`, and the title / `Not shown` list. The rest —
+class="entity">` boxes — every column marked by the level it belongs to, every foreign key
+carrying its referential action, every table the document marks carrying its role badge — the
+`REL` array, the second set of coordinates in `data-compact`, and the title, the legend's
+counts and the `Not shown` list. The rest —
 the CSS and the JS — is the deliverable's machinery. Read it once, then leave it alone: **every
 fix in this skill is a coordinate, never a change to the router.**
 
@@ -95,12 +97,47 @@ tighter grid. Two invariants make that safe, and both must survive any edit:
 6. Put every column of section 4 in its box, each `<li>` marked `data-in`: `k` for the primary
    key, every foreign key and every column in a unique; `m` for the rest of what the data model
    itself puts forward; `a` for everything else.
-7. Write one `REL` entry per foreign key — cardinality rule below, self-references excepted —
+7. **Put the referential action in the key gutter, on every foreign-key column** — `FK·R` for
+   `RESTRICT`, `FK·C` for `CASCADE`, read off §4's type cell. *What happens if I delete this
+   row?* is a question a reader brings to an ERD, and the crow's foot having no notation for it
+   is an argument against putting the rule **in the foot**, not against putting it on the canvas.
+   Two things bound it. The gutter is a fixed `30px` track and four monospace characters at 10px
+   is what fits — that is the whole budget, and a fifth character is not a CSS problem to solve
+   but a tag to shorten. And **it does not go in the `.t` type cell**: that cell already carries
+   `→ parent_table`, the widest atom in several boxes, and the row is a `30px 1fr auto` grid
+   whose `1fr` name column eats the slack, so a third atom there re-opens the silent-wrap trap
+   in Don't. One tag per **column**, so both halves of a composite carry one — which makes the
+   tags outnumber the foreign keys, which outnumber the edges wherever a self-reference is listed
+   rather than drawn. **State all three counts in the legend**, because a reader who counts them
+   will find they differ and the difference is the notation, not a mistake.
+8. **Badge each table's role in its header**, as text in a `<span class="rb">` and never as
+   colour, from a vocabulary closed to three:
+   - `contended` — **§9's contention table names this row as serialised by a row lock**
+     (`SELECT … FOR UPDATE`). The badge means *writers queue on this row*. §9 will usually name
+     more contended things than that, and the others are not badged: a race closed by a unique
+     key or by a guarded `UPDATE` is one where the loser gets an error rather than a wait, and
+     that is already on the canvas as the constraint it is. Say in the legend which of §9's rows
+     earned a badge, which did not, and where the ones that did not are already visible — a
+     reader who checks §9 against the picture should find the difference explained, not implied.
+   - `ledger` — §4 rejects every update and delete on the table. Give each one a footer line
+     stating the positive claim: what a reader would go looking for as a column is a sum over
+     the rows. Then **take that claim out of `Not shown`**, where it reads as a caveat rather
+     than as the design decision it is, and leave a pointer in its place.
+   - `external` — every `.entity.boundary` box. `data-nocount` leaves its `.ct` empty, so the
+     badge has that slot.
+   This is the highest-value mark on the page: it is what makes the diagram read as a system
+   rather than as a list of tables. It is also the one that can push a box past its cap, because
+   the header's width feeds the box's `max-content` width and a badge is a third child in a
+   `flex` row that held two. **Check the longest table name on the page, at both grids, before
+   declaring it done.** If a badge and the cap collide there, re-read whether the document
+   really earned that badge before touching the cap — raising the cap widens every box already
+   at it, and the canvas with them.
+9. Write one `REL` entry per foreign key — cardinality rule below, self-references excepted —
    and **order the array so that, on every side that carries more than one edge, the slots run
    in the same top-to-bottom (or left-to-right) order as the boxes they reach.** `draw()` hands
    out slots in `REL` order, so this is the only control you have over which edge sits where on
    a crowded side, and getting it right is what makes the next note true.
-8. Place the compact grid in `data-compact` when the detail grid runs more than two rows deep.
+10. Place the compact grid in `data-compact` when the detail grid runs more than two rows deep.
    **The page opens collapsed, so this is the first thing a reader sees, not a mode they switch
    to** — leave it off a deep diagram and the page opens on the roomy grid with small boxes
    stranded in its whitespace. Shallower than two rows there is nothing to reclaim, and leaving
@@ -111,14 +148,14 @@ tighter grid. Two invariants make that safe, and both must survive any edit:
    long foreign-key or composite-key column name. Do not guess it: an overtight cap drops the
    end of a type or a name silently, and a name that lost its last characters is a wrong name,
    not a short one.
-9. Run `verify.js` and read **all three** of the things it returns. `failures` is a defect, and
+11. Run `verify.js` and read **all three** of the things it returns. `failures` is a defect, and
    is fixed by moving a box, never by editing the router. `warnings` is a layout that is legal
    but may read badly — a leaf alone in a column, a hub fanning its edges out of one side, a
    label filling its gutter — and each one is either fixed, or kept deliberately and named in
    the report. Read `lattice` even when both lists are empty: it prints the occupancy of every
    column and row, and more entries than the columns you meant to draw means a box is off the
    grid.
-10. **Critique the render, not the file.** Take a screenshot of both grids and look at them with
+12. **Critique the render, not the file.** Take a screenshot of both grids and look at them with
    fresh eyes against the checklist in **Verify** — composition only exists in the picture, and
    critiquing the markup you just wrote is critiquing it from inside the choices that made it.
    The critique **reports; it does not edit**: every finding becomes a deliberate coordinate
@@ -137,7 +174,20 @@ tighter grid. Two invariants make that safe, and both must survive any edit:
   elide with `data-in`, never by omission.
 - **Say what is hidden, and by how much.** The count badge in each header (`6/8`) does that and
   stays true as the level changes. The footer is for constraint notes — unique keys, composite
-  FK targets, append-only — never a column count that one click makes wrong.
+  FK targets, append-only, and the ledger's positive claim — never a column count that one click
+  makes wrong.
+- **Answer "what happens if I delete this row?" on the canvas.** Every foreign-key column carries
+  §4's referential action in its gutter, `FK·R` or `FK·C`. The crow's foot cannot express it;
+  that is a fact about the foot, not about the page, and pushing the whole of §4's delete
+  behaviour into a `Not shown` bullet answers a question the reader is holding with a footnote.
+- **Say the one thing about a table its columns cannot show, and say it as a word.** `contended`
+  where §9 serialises the row under a lock, `ledger` where §4 refuses updates and deletes,
+  `external` on a boundary box — and nothing else, ever. A closed vocabulary is what makes the
+  absence of a badge mean something.
+- **State a ledger's derived total positively, in the box.** `append-only` is the rule; *a
+  balance is a sum over these rows, never a column* is the design. One short line, because the
+  footer is what sets the box's width, and the same line on every table of the ledger so the pair
+  or the trio reads as one mechanism.
 - **Both ends of every edge carry a cardinality.** The parent end is that column's `Null` cell
   and nothing else: nullable → `0..1` plus `optional: true`, not-null → `1`. The child end is
   `*` unless the model *states* a bound — a unique on the child makes it `0..1`. Do not write
@@ -162,6 +212,16 @@ tighter grid. Two invariants make that safe, and both must survive any edit:
 
 ## Don't
 
+- **Don't infer a badge from a table looking hot.** The badge is a view of the document like
+  every other mark on the page. If §9's contention table does not name the row, there is no
+  `contended` badge, however obviously the table is the busy one — and if §9 names a row that a
+  constraint closes rather than a lock, that is not a badge either, because the loser gets an
+  error rather than a wait and the constraint is already in the footer. A vocabulary you extend
+  once is a vocabulary that means nothing the next time.
+- **Don't put the delete rule in the type cell.** `→ parent_table` is already the widest atom in
+  several boxes and the row's `1fr` name column eats the slack; a third atom there wraps
+  silently. The gutter is fixed-width and has the room — four monospace characters at 10px, no
+  more.
 - **Don't invent a relationship the document does not state.** Two tables that plainly *should*
   relate but don't is a finding — put it in `Not shown` and tell the user. Drawing it makes the
   page a second, wrong specification.
@@ -219,9 +279,19 @@ Counts first:
 grep -c '<article class="entity"' docs/<folder>/NN-erd.html   # == tables in section 4
 grep -c '<li data-in='            docs/<folder>/NN-erd.html   # == columns in section 4 + boundary rows
 grep -o 'FK→[a-z_]*' docs/<folder>/NN-data-model.md | sort | uniq -c   # one REL entry each
+grep -o '<b>[^<]*</b>' docs/<folder>/NN-erd.html | sort | uniq -c      # gutter marks, incl. FK·R / FK·C
+grep -o 'class="rb">[a-z]*' docs/<folder>/NN-erd.html | sort | uniq -c # role badges, by role
 ```
 
-The last one over-counts — section 4's type legend and section 6's restatements match the same
+The fourth is the delete-rule count and it is **meant** to exceed the number of foreign keys —
+one tag per column, so each half of a composite carries one — which in turn exceeds the number
+of edges wherever a self-reference is listed rather than drawn. Reconcile all three by hand and
+put all three in the legend; a reader who counts and finds them different should find the
+difference explained on the page. The fifth must draw only on `contended`, `ledger` and
+`external`, `external` must appear exactly as often as `class="entity boundary"`, and every
+`contended` must be traceable to a row of §9's contention table that a lock protects.
+
+The `FK→…` grep over-counts — section 4's type legend and section 6's restatements match the same
 pattern, and composite keys are written `FK (a, b) → …` instead — so reconcile it by hand and
 show the reconciliation. Edges = foreign keys − self-references, composites counted once.
 
@@ -232,8 +302,12 @@ three things:
 
 - **`failures`** — the sweep. Every uniform level, every single-box override and a thousand
   mixed states, checking for boxes on top of each other, edges under boxes, labels over boxes,
-  two edges drawn along one line, and any name that wrapped or clipped. **`failures: []` is the
-  only passing result**, and every entry is fixed by moving a box.
+  two edges drawn along one line, any name that wrapped or clipped, and any gutter mark that
+  overflowed its 30px track. It also runs one notation check: that every role badge is in the
+  closed vocabulary, that every boundary box says `external` and nothing else does, and that no
+  foreign key was left with a bare `FK`. **`failures: []` is the only passing result.** A
+  geometric entry is fixed by moving a box; a notation entry is fixed in the markup, and the
+  check cannot tell you whether the *right* table is badged — only §4 and §9 can.
 - **`warnings`** — the composition check, run once per grid rather than once per state, because
   it is a property of the placement. A leaf alone in a column or a row **with an empty cell
   beside its partner to move to**; a box with four or more edges sending them out of fewer than
@@ -253,13 +327,22 @@ catch what someone already thought to write down:
 - Do the subject-area groups read as groups from the arrangement, not just from the colour?
 - Are two boxes sitting next to each other with no edge in a way that implies one?
 - Is anything cramped that the pixel checks called legal?
+- Do the badges read as a system — is every table the model marks marked, and can a reader who
+  goes back to §9 or §4 see why the unbadged ones are unbadged? An unexplained gap between the
+  document's list and the canvas's is the failure mode here, not a wrong badge.
+- Did any box get wider? The compact grid is the one that gets projected, so a badge that bought
+  a box 60px has spent it out of the whole picture's legibility. Compare the widths against the
+  redraw you replaced, box by box, and prefer the shorter honest label every time.
 
 Findings become deliberate coordinate changes, and then `verify.js` runs again — a moved box
 invalidates every state the sweep just cleared.
 
-Report the counts, both canvas sizes, how many states were swept, every warning and whether it
-was fixed or kept on purpose, what the critique round found, and anything the data model
-left ambiguous. Report the layout as a lattice too — how many distinct column x values and row y
+Report the counts — tables, columns, foreign keys, delete-rule tags, edges, badges by role —
+both canvas sizes, how many states were swept, every warning and whether it was fixed or kept on
+purpose, what the critique round found, and anything the data model left ambiguous. §4 and §9
+will leave something ambiguous every time here: which of §9's contended rows earn a badge, and
+whether a table §4 makes append-only is a ledger in the sense the footer claims. Decide it, say
+which way, and say why on the page as well as in the report. Report the layout as a lattice too — how many distinct column x values and row y
 values the boxes occupy. **If those two numbers are larger than the number of columns and rows
 you meant to draw, a box is off the grid**, and no amount of `failures: []` makes that the
 picture you wanted:
