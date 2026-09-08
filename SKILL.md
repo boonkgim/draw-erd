@@ -100,14 +100,17 @@ tighter grid. Two invariants make that safe, and both must survive any edit:
    in the same top-to-bottom (or left-to-right) order as the boxes they reach.** `draw()` hands
    out slots in `REL` order, so this is the only control you have over which edge sits where on
    a crowded side, and getting it right is what makes the next note true.
-8. Place the compact grid in `data-compact` when the detail grid runs more than two rows deep;
-   shallower than that there is no whitespace to reclaim, and leaving `data-compact` off every
-   box is the supported way to skip it. Same tables in the same cells — collapsing should
-   tighten the picture, not redraw it — with the pitch taken from the collapsed sizes. Measure
-   the narrowest `.canvas.compact .entity` max-width that makes nothing wrap or clip, measured
-   against the widest row any box still shows at `keys` level — usually a long foreign-key or
-   composite-key column name. Do not guess it: an overtight cap drops the end of a type or a
-   name silently, and a name that lost its last characters is a wrong name, not a short one.
+8. Place the compact grid in `data-compact` when the detail grid runs more than two rows deep.
+   **The page opens collapsed, so this is the first thing a reader sees, not a mode they switch
+   to** — leave it off a deep diagram and the page opens on the roomy grid with small boxes
+   stranded in its whitespace. Shallower than two rows there is nothing to reclaim, and leaving
+   `data-compact` off every box is still the supported way to skip it. Same tables in the same
+   cells — collapsing should tighten the picture, not redraw it — with the pitch taken from the
+   collapsed sizes. Measure the narrowest `.canvas.compact .entity` max-width that makes nothing
+   wrap or clip, measured against the widest row any box still shows at `keys` level — usually a
+   long foreign-key or composite-key column name. Do not guess it: an overtight cap drops the
+   end of a type or a name silently, and a name that lost its last characters is a wrong name,
+   not a short one.
 9. Run `verify.js` and read **all three** of the things it returns. `failures` is a defect, and
    is fixed by moving a box, never by editing the router. `warnings` is a layout that is legal
    but may read badly — a leaf alone in a column, a hub fanning its edges out of one side, a
@@ -127,9 +130,11 @@ tighter grid. Two invariants make that safe, and both must survive any edit:
 
 - **One box per table in section 4, and nothing else.** Same names, same spelling, no plurals
   invented, no join table that the document does not have.
-- **Every column goes in its box; `data-in` decides when it shows.** The page opens at the data
-  model's own selection, so it opens saying what the document says. A box of 20 rows is a table,
-  not a diagram — but a column left out of the markup can never be revealed at all.
+- **Every column goes in its box; `data-in` decides when it shows.** The page opens at `keys`,
+  because the first question a diagram answers is which tables reach which, and that is the
+  question the roomy grid is worst at; §4's own selection is one click away. A box of 20 rows is
+  a table, not a diagram — but a column left out of the markup can never be revealed at all, so
+  elide with `data-in`, never by omission.
 - **Say what is hidden, and by how much.** The count badge in each header (`6/8`) does that and
   stays true as the level changes. The footer is for constraint notes — unique keys, composite
   FK targets, append-only — never a column count that one click makes wrong.
@@ -172,8 +177,9 @@ tighter grid. Two invariants make that safe, and both must survive any edit:
   when a nudged box has just made the sweep pass.
 - **Don't let a leaf define a column or a row.** A column or a row holding exactly one box, when
   that box has one relationship, means the leaf is in the wrong cell — the lattice grew by a
-  whole column's width to seat a table that could have hung inside it. `verify.js` warns on this;
-  the fix is a hole beside its partner, not a wider canvas.
+  whole column's width to seat a table that could have hung inside it. `verify.js` warns on this
+  and names the free cell to move it to; it stays quiet when there is no such cell, because a
+  two-box diagram is two leaves with nowhere to go.
 - **Don't draw derived values or "deliberately absent" columns.** `ends_at`, `seats_remaining`
   and a `status` column that the model rejected are not in the database; putting them in a box
   is how they get built.
@@ -229,9 +235,10 @@ three things:
   two edges drawn along one line, and any name that wrapped or clipped. **`failures: []` is the
   only passing result**, and every entry is fixed by moving a box.
 - **`warnings`** — the composition check, run once per grid rather than once per state, because
-  it is a property of the placement. A leaf alone in a column or a row; a box with four or more
-  edges sending them out of fewer than three sides, or more than half out of one; a label
-  filling more than half the corridor it sits in. A warning is a judgement, not a defect: fix
+  it is a property of the placement. A leaf alone in a column or a row **with an empty cell
+  beside its partner to move to**; a box with four or more edges sending them out of fewer than
+  three sides, or more than half out of one; a label filling more than half the corridor it
+  sits in. A warning is a judgement, not a defect: fix
   it, or keep it and say in the report that you chose it. Never leave one unmentioned.
 - **`lattice`** — the occupancy of every column and row in both grids, read back off the page.
   Check it even when the other two are empty: it is the only thing that shows a box sitting

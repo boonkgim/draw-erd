@@ -27,6 +27,7 @@
 function verifyErd({ mixes = 1000, seed = 20260818 } = {}) {
   const ents = [...document.querySelectorAll('.entity')];
   const LV = ['keys', 'model', 'all'];
+  const entry = ents.map(n => n.dataset.lvl);   // put the page back the way it was found
   const canvas = document.getElementById('canvas');
 
   function problems() {
@@ -114,28 +115,59 @@ function verifyErd({ mixes = 1000, seed = 20260818 } = {}) {
 
     // The lattice, read back off the page: one entry per distinct x (or y), with what sits
     // on it. More entries than the columns you meant to draw means a box is off the grid.
-    const axis = (prop, name) => {
+    const axis = prop => {
       const at = new Map();
       for (const n of ents) {
         const v = n[prop];
         if (!at.has(v)) at.set(v, []);
         at.get(v).push(n.id.slice(2));
       }
-      const occ = [...at.entries()].sort((p, q) => p[0] - q[0]);
-
-      // A leaf — exactly one relationship — is the only box whose cell is not pinned by the
-      // intersection of its partners' neighbourhoods. Alone in a column, it has bought that
-      // column's full width for one box, and there is almost always a hole beside its
-      // partner inside the lattice that already exists.
-      for (const [, ids] of occ)
-        if (ids.length === 1 && deg[ids[0]] === 1)
-          warn.push(`LEAF ${ids[0]} is the only box in its ${name} (${grid}) — ` +
-                    `a leaf should not open a ${name} of its own`);
-
-      return occ.map(([v, ids]) => `${v}px × ${ids.length}: ${ids.join(', ')}`);
+      return [...at.entries()].sort((p, q) => p[0] - q[0])
+        .map(([v, ids]) => `${v}px × ${ids.length}: ${ids.join(', ')}`);
     };
-    const columns = axis('offsetLeft', 'column');
-    const rows = axis('offsetTop', 'row');
+    const columns = axis('offsetLeft'), rows = axis('offsetTop');
+
+    // A leaf — exactly one relationship — is the only box whose cell is not pinned by the
+    // intersection of its partners' neighbourhoods. Alone in a column, it has bought that
+    // column's full width for one box. That is only a finding if there is somewhere else to
+    // put it: an empty cell beside its partner, inside the lattice that already exists, in a
+    // different column. A two-box diagram is two leaves with nowhere to go and is not one.
+    const xs = [...new Set(ents.map(n => n.offsetLeft))].sort((a, b) => a - b);
+    const ys = [...new Set(ents.map(n => n.offsetTop))].sort((a, b) => a - b);
+    const at = new Map(), taken = new Set();
+    for (const n of ents) {
+      const c = [xs.indexOf(n.offsetLeft), ys.indexOf(n.offsetTop)];
+      at.set(n.id.slice(2), c);
+      taken.add(c.join(','));
+    }
+    const partners = {};
+    for (const r of REL) {
+      (partners[r.from] = partners[r.from] || []).push(r.to);
+      (partners[r.to] = partners[r.to] || []).push(r.from);
+    }
+    for (const [name, ax, len] of [['column', 0, xs.length], ['row', 1, ys.length]]) {
+      const lanes = new Map();
+      for (const [id, c] of at) {
+        if (!lanes.has(c[ax])) lanes.set(c[ax], []);
+        lanes.get(c[ax]).push(id);
+      }
+      for (const [lane, ids] of lanes) {
+        if (ids.length !== 1 || deg[ids[0]] !== 1) continue;
+        const leaf = ids[0], mate = partners[leaf][0], p = at.get(mate);
+        let hole = null;
+        for (let dc = -1; dc <= 1; dc++)
+          for (let dr = -1; dr <= 1; dr++) {
+            if (!dc && !dr) continue;
+            const c = [p[0] + dc, p[1] + dr];
+            if (c[0] < 0 || c[0] >= xs.length || c[1] < 0 || c[1] >= ys.length) continue;
+            if (c[ax] === lane || taken.has(c.join(','))) continue;
+            hole = c;
+          }
+        if (hole)
+          warn.push(`LEAF ${leaf} is the only box in its ${name} (${grid}) — ` +
+                    `cell [col ${hole[0]}, row ${hole[1]}] beside ${mate} is free`);
+      }
+    }
 
     // A hub's edges should leave on several sides. `sides()` picks by centre separation, so
     // this is steered by where the partners sit, not by the router: put a partner in the row
@@ -211,7 +243,7 @@ function verifyErd({ mixes = 1000, seed = 20260818 } = {}) {
   set(ents.map(() => 'keys'));
   const compact = composition('compact');
 
-  set(ents.map(() => 'model'));
+  set(entry);
   const statesTested = 3 + 3 * ents.length * 3 + mixes;
   return { boxes: ents.length, edges: document.querySelectorAll('.edge').length,
            statesTested, sizes, failures,

@@ -119,8 +119,8 @@
 <div class="bar">
   <span id="lvl-label">Columns</span>
   <span class="seg" role="group" aria-labelledby="lvl-label">
-    <button type="button" data-set="keys" aria-pressed="false">Keys only</button>
-    <button type="button" data-set="model" aria-pressed="true">Data model</button>
+    <button type="button" data-set="keys" aria-pressed="true">Keys only</button>
+    <button type="button" data-set="model" aria-pressed="false">Data model</button>
     <button type="button" data-set="all" aria-pressed="false">All columns</button>
   </span>
   <span class="mixed" id="mixed" hidden>mixed — some tables set on their own</span>
@@ -195,13 +195,14 @@
     <li>Header colour groups tables by subject area — catalogue, booking and money, credit and
         cancellation, external — and the grouping is also stated in each table's name, so colour
         is never the only carrier of meaning.</li>
-    <li><strong>Keys only</strong> leaves each box with what a relationship is made of: its
-        primary key, every foreign key, and every column in a unique — including the ones that
-        only exist to be half of a composite reference — and pulls the diagram onto a tighter grid,
-        because short boxes do not need the room tall ones do. <strong>Data model</strong> is the
-        selection §4 makes; <strong>All columns</strong> is every column §4 lists, and the count
-        beside each table name says which you are reading. Expanding any one table opens the
-        diagram back onto the roomy grid.</li>
+    <li>The page <strong>opens at Keys only</strong>, which leaves each box with what a
+        relationship is made of: its primary key, every foreign key, and every column in a unique
+        — including the ones that only exist to be half of a composite reference — on a tighter
+        grid, because short boxes do not need the room tall ones do. It opens there because the
+        first question a diagram answers is which tables reach which.
+        <strong>Data model</strong> is the selection §4 makes; <strong>All columns</strong> is
+        every column §4 lists, and the count beside each table name says which you are reading.
+        Expanding any one table opens the diagram back onto the roomy grid.</li>
     <li>Both grids put the same tables in the same cells, and every edge keeps the side of the box
         it leaves from in either one, so the two are the same picture at two sizes rather than two
         pictures. Nothing is laid out automatically: both grids are placed by hand.</li>
@@ -446,7 +447,9 @@ for (const n of entities) {
   h.addEventListener('blur', unlit);
 }
 
-for (const n of entities) setLevel(n, 'model');
+// The page opens collapsed: which tables reach which is the first question it answers,
+// and it is the question the roomy grid is worst at. Every other level is one click away.
+for (const n of entities) setLevel(n, 'keys');
 syncBar();
 calibrate();
 addEventListener('resize', draw);
