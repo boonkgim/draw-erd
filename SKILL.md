@@ -71,7 +71,18 @@ tighter grid. Two invariants make that safe, and both must survive any edit:
    the top; put a child in the row below and to the side and it lands on the side. Then read
    the assignment back off the page (`SIDES` after `calibrate()`) rather than assuming it — a
    diagonal decided by a 30px margin is a decision, and it should be one you made.
-4. **Place both grids as a lattice: one x per column, one y per row, and every box on an
+4. **Place the leaves last, and never let one open a column or a row of its own.** A table
+   with exactly one relationship is the only box whose cell is not already decided: every box
+   with two or more partners is pinned by the intersection of its partners' neighbourhoods, so
+   the leaves are the whole remaining freedom in the layout. Fix everything else first, then
+   give each leaf a cell the lattice already has — of the eight cells around its partner, take
+   a hole inside the existing columns and rows before taking one that adds a column or a row.
+   **A leaf that adds a column buys that column's full width for one box**, and the rest of it
+   is the empty region a finished diagram gets asked about. Where two holes qualify, take the
+   one that continues the chain in the direction it was already going over the one that doubles
+   it back level with where it started — and let that outrank *parents above and left of their
+   children*, which is a tie-breaker, and this is not a tie.
+5. **Place both grids as a lattice: one x per column, one y per row, and every box on an
    intersection.** Pick the column x from the widest box in that column plus a gutter, and the
    row y from the tallest box in that row plus a gutter, so the gutters are near-constant even
    though the pitch is not. **The gutter must be wider than the longest edge label crossing it,
@@ -81,15 +92,15 @@ tighter grid. Two invariants make that safe, and both must survive any edit:
    The temptation is real — see the coincident-bend note below — and it is always the wrong fix:
    a single off-grid box is the difference between a diagram that reads as rows and columns and
    one that reads as scatter.
-5. Put every column of section 4 in its box, each `<li>` marked `data-in`: `k` for the primary
+6. Put every column of section 4 in its box, each `<li>` marked `data-in`: `k` for the primary
    key, every foreign key and every column in a unique; `m` for the rest of what the data model
    itself puts forward; `a` for everything else.
-6. Write one `REL` entry per foreign key — cardinality rule below, self-references excepted —
+7. Write one `REL` entry per foreign key — cardinality rule below, self-references excepted —
    and **order the array so that, on every side that carries more than one edge, the slots run
    in the same top-to-bottom (or left-to-right) order as the boxes they reach.** `draw()` hands
    out slots in `REL` order, so this is the only control you have over which edge sits where on
    a crowded side, and getting it right is what makes the next note true.
-7. Place the compact grid in `data-compact` when the detail grid runs more than two rows deep;
+8. Place the compact grid in `data-compact` when the detail grid runs more than two rows deep;
    shallower than that there is no whitespace to reclaim, and leaving `data-compact` off every
    box is the supported way to skip it. Same tables in the same cells — collapsing should
    tighten the picture, not redraw it — with the pitch taken from the collapsed sizes. Measure
@@ -97,8 +108,20 @@ tighter grid. Two invariants make that safe, and both must survive any edit:
    against the widest row any box still shows at `keys` level — usually a long foreign-key or
    composite-key column name. Do not guess it: an overtight cap drops the end of a type or a
    name silently, and a name that lost its last characters is a wrong name, not a short one.
-8. Run `verify.js`, fix what it reports by moving boxes, and then look at the page in a
-   browser — in both grids.
+9. Run `verify.js` and read **all three** of the things it returns. `failures` is a defect, and
+   is fixed by moving a box, never by editing the router. `warnings` is a layout that is legal
+   but may read badly — a leaf alone in a column, a hub fanning its edges out of one side, a
+   label filling its gutter — and each one is either fixed, or kept deliberately and named in
+   the report. Read `lattice` even when both lists are empty: it prints the occupancy of every
+   column and row, and more entries than the columns you meant to draw means a box is off the
+   grid.
+10. **Critique the render, not the file.** Take a screenshot of both grids and look at them with
+   fresh eyes against the checklist in **Verify** — composition only exists in the picture, and
+   critiquing the markup you just wrote is critiquing it from inside the choices that made it.
+   The critique **reports; it does not edit**: every finding becomes a deliberate coordinate
+   change, and `verify.js` runs again after, because a moved box invalidates the whole sweep.
+   One round is the budget. This is not how you enforce the rules above — `verify.js` does that,
+   and it cannot drift. It is how you find the rule that is not written yet.
 
 ## Do
 
@@ -147,6 +170,10 @@ tighter grid. Two invariants make that safe, and both must survive any edit:
   sitting between two of them. `failures: []` does not mean the layout is good — the sweep
   checks that nothing collides, not that anything lines up, and the two are easy to confuse
   when a nudged box has just made the sweep pass.
+- **Don't let a leaf define a column or a row.** A column or a row holding exactly one box, when
+  that box has one relationship, means the leaf is in the wrong cell — the lattice grew by a
+  whole column's width to seat a table that could have hung inside it. `verify.js` warns on this;
+  the fix is a hole beside its partner, not a wider canvas.
 - **Don't draw derived values or "deliberately absent" columns.** `ends_at`, `seats_remaining`
   and a `status` column that the model rejected are not in the database; putting them in a box
   is how they get built.
@@ -194,21 +221,51 @@ show the reconciliation. Edges = foreign keys − self-references, composites co
 
 Then the geometry, which is not an eyeball job. Open the page and run
 `.claude/skills/draw-erd/verify.js`: paste it into the console, or load it with a `<script src>`
-from the same directory, since `file://` blocks `fetch`. It drives the page through every
-uniform level, every single-box override and a thousand mixed states, checking for boxes on top
-of each other, edges under boxes, labels over boxes, two edges drawn along one line, and any
-name that wrapped or clipped. `failures: []` is the only passing result.
+(a relative path out of `docs/` works — `file://` blocks `fetch`, not `<script>`). It returns
+three things:
 
-Report the counts, both canvas sizes, how many states were swept, and anything the data model
+- **`failures`** — the sweep. Every uniform level, every single-box override and a thousand
+  mixed states, checking for boxes on top of each other, edges under boxes, labels over boxes,
+  two edges drawn along one line, and any name that wrapped or clipped. **`failures: []` is the
+  only passing result**, and every entry is fixed by moving a box.
+- **`warnings`** — the composition check, run once per grid rather than once per state, because
+  it is a property of the placement. A leaf alone in a column or a row; a box with four or more
+  edges sending them out of fewer than three sides, or more than half out of one; a label
+  filling more than half the corridor it sits in. A warning is a judgement, not a defect: fix
+  it, or keep it and say in the report that you chose it. Never leave one unmentioned.
+- **`lattice`** — the occupancy of every column and row in both grids, read back off the page.
+  Check it even when the other two are empty: it is the only thing that shows a box sitting
+  between two columns rather than on one.
+
+Then the critique pass, once, against a screenshot of each grid — because a warning can only
+catch what someone already thought to write down:
+
+- Is there a dead region, and is it dead because the model has nothing there or because a box
+  is in the wrong cell?
+- Does each chain step in one direction, or does one double back level with where it started?
+- Do the subject-area groups read as groups from the arrangement, not just from the colour?
+- Are two boxes sitting next to each other with no edge in a way that implies one?
+- Is anything cramped that the pixel checks called legal?
+
+Findings become deliberate coordinate changes, and then `verify.js` runs again — a moved box
+invalidates every state the sweep just cleared.
+
+Report the counts, both canvas sizes, how many states were swept, every warning and whether it
+was fixed or kept on purpose, what the critique round found, and anything the data model
 left ambiguous. Report the layout as a lattice too — how many distinct column x values and row y
 values the boxes occupy. **If those two numbers are larger than the number of columns and rows
 you meant to draw, a box is off the grid**, and no amount of `failures: []` makes that the
 picture you wanted:
 
 ```bash
-grep -o 'style="left:[0-9]*px' docs/<folder>/NN-erd.html | sort -u | wc -l   # == columns
-grep -o 'px; top:[0-9]*px'     docs/<folder>/NN-erd.html | sort -u | wc -l   # == rows
+grep -o 'style="left:[0-9]*px' docs/<folder>/NN-erd.html | sort | uniq -c   # boxes per column
+grep -o 'px; top:[0-9]*px'     docs/<folder>/NN-erd.html | sort | uniq -c   # boxes per row
 ```
 
-Anchor them like that: a bare `top:[0-9]*px` also matches the legend's inline `margin-top`, and
-a lattice that looks one row too tall is a scare, not a finding.
+`uniq -c` rather than `sort -u | wc -l`, because the count of lines is the number of columns and
+the counts *within* them are the occupancy — and a `1` there is the leaf check by hand: cross it
+against the box's `REL` entries, and a column holding one box that has one relationship is a box
+in the wrong cell. `verify.js`'s `lattice` prints the same thing with the names filled in.
+
+Anchor the patterns like that: a bare `top:[0-9]*px` also matches the legend's inline
+`margin-top`, and a lattice that looks one row too tall is a scare, not a finding.

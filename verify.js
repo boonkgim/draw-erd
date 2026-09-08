@@ -1,12 +1,25 @@
-// draw-erd — geometry sweep. Paste into the browser console with the ERD open, or run it
-// through an evaluate_script tool, and read the result. It returns { failures: [] } when the
-// page is clean; anything in `failures` is a defect to fix by MOVING A BOX, never by editing
-// the router.
+// draw-erd — geometry sweep and composition check. Paste into the browser console with the
+// ERD open, or run it through an evaluate_script tool, and read the result.
 //
-// It drives the page's own state, so it catches what an eye on one screenshot cannot: the
-// diagram has three levels per box and two grids, and a box collapsing changes every edge
+// Two kinds of finding, and they are not the same kind of thing:
+//
+//   failures  — the page is WRONG. Boxes on top of each other, an edge under a box, a label
+//               over a box, two edges along one line, a name wrapped or clipped. Every one is
+//               a defect to fix by MOVING A BOX, never by editing the router. `failures: []`
+//               is the only passing result.
+//   warnings  — the page is LEGAL but may read badly. A leaf that opened a column of its own,
+//               a hub fanning its edges out of one side, a label filling its gutter. Each is a
+//               judgement, not a defect: fix it, or keep it and say in the report that you
+//               chose it. Never leave one unmentioned.
+//
+// The sweep drives the page's own state, so it catches what an eye on one screenshot cannot:
+// the diagram has three levels per box and two grids, and a box collapsing changes every edge
 // anchored to it. Checking only the state you happen to be looking at is checking one of
-// thousands.
+// thousands. The composition check is the opposite — it is a property of the placement, not of
+// the state, so it runs once per grid rather than once per state.
+//
+// Neither one can see whether the picture reads well. That is the critique pass, and it looks
+// at a screenshot, not at this.
 //
 //   verifyErd()            // three uniform levels + every single-box override + 1000 mixes
 //   verifyErd({mixes: 0})  // uniform levels and single-box overrides only, if you are in a hurry
@@ -83,6 +96,88 @@ function verifyErd({ mixes = 1000, seed = 20260818 } = {}) {
     return bad;
   }
 
+  // ---- Composition ------------------------------------------------------------------
+  // What problems() cannot see: a layout with nothing colliding that still reads badly.
+  // `failures: []` says the picture is legal, which is not the same as saying it is the
+  // picture you wanted, and the two are easy to confuse when a nudged box has just made
+  // the sweep pass. Everything here is a property of the placement, so it runs once per
+  // grid — call it in a uniform state, and read `lattice` even when `warnings` is empty.
+  function composition(grid) {
+    const warn = [], deg = {}, side = {};
+    REL.forEach((r, i) => {
+      deg[r.from] = (deg[r.from] || 0) + 1;
+      deg[r.to] = (deg[r.to] || 0) + 1;
+      const [a, b] = SIDES ? SIDES[i] : ['?', '?'];
+      (side[r.from] = side[r.from] || []).push(a);
+      (side[r.to] = side[r.to] || []).push(b);
+    });
+
+    // The lattice, read back off the page: one entry per distinct x (or y), with what sits
+    // on it. More entries than the columns you meant to draw means a box is off the grid.
+    const axis = (prop, name) => {
+      const at = new Map();
+      for (const n of ents) {
+        const v = n[prop];
+        if (!at.has(v)) at.set(v, []);
+        at.get(v).push(n.id.slice(2));
+      }
+      const occ = [...at.entries()].sort((p, q) => p[0] - q[0]);
+
+      // A leaf — exactly one relationship — is the only box whose cell is not pinned by the
+      // intersection of its partners' neighbourhoods. Alone in a column, it has bought that
+      // column's full width for one box, and there is almost always a hole beside its
+      // partner inside the lattice that already exists.
+      for (const [, ids] of occ)
+        if (ids.length === 1 && deg[ids[0]] === 1)
+          warn.push(`LEAF ${ids[0]} is the only box in its ${name} (${grid}) — ` +
+                    `a leaf should not open a ${name} of its own`);
+
+      return occ.map(([v, ids]) => `${v}px × ${ids.length}: ${ids.join(', ')}`);
+    };
+    const columns = axis('offsetLeft', 'column');
+    const rows = axis('offsetTop', 'row');
+
+    // A hub's edges should leave on several sides. `sides()` picks by centre separation, so
+    // this is steered by where the partners sit, not by the router: put a partner in the row
+    // above and its edge lands on the top, one below and to the side and it lands on the side.
+    for (const t of Object.keys(deg)) {
+      if (deg[t] < 4) continue;
+      const hist = {};
+      for (const s of side[t]) hist[s] = (hist[s] || 0) + 1;
+      const used = Object.keys(hist).length;
+      const most = Math.max(...Object.values(hist));
+      if (used < 3 || most > Math.ceil(deg[t] / 2))
+        warn.push(`HUB ${t} sends ${deg[t]} edges out of ${used} side(s) ` +
+                  `${JSON.stringify(hist)} (${grid}) — spread its partners by compass`);
+    }
+
+    // A label is centred on its edge's bend, which lands in a gutter. One filling more than
+    // half the corridor it sits in reads as cramped even though nothing collides. A label
+    // whose vertical band clears every box is in a row gutter and is not measured.
+    const boxes = ents.map(n => ({
+      x: n.offsetLeft, y: n.offsetTop,
+      r: n.offsetLeft + n.offsetWidth, b: n.offsetTop + n.offsetHeight,
+    }));
+    for (const g of document.querySelectorAll('.edge')) {
+      const t = g.querySelector('text');
+      if (!t) continue;
+      const bb = t.getBBox(), cx = bb.x + bb.width / 2;
+      let left = -Infinity, right = Infinity;
+      for (const bx of boxes) {
+        if (bb.y + bb.height < bx.y || bb.y > bx.b) continue;   // not beside this box
+        if (bx.r <= cx) left = Math.max(left, bx.r);
+        if (bx.x >= cx) right = Math.min(right, bx.x);
+      }
+      if (!isFinite(left) || !isFinite(right)) continue;        // sits in a row gutter
+      const corridor = right - left;
+      if (bb.width > corridor * 0.5)
+        warn.push(`LABEL "${t.textContent}" fills ${Math.round(bb.width / corridor * 100)}% ` +
+                  `of its ${Math.round(corridor)}px gutter (${grid}) — shorten it or widen it`);
+    }
+
+    return { warn, columns, rows };
+  }
+
   const set = st => { ents.forEach((n, i) => setLevel(n, st[i])); applyLayout(); };
   const failures = [], sizes = {};
   const run = (name, st) => {
@@ -110,10 +205,19 @@ function verifyErd({ mixes = 1000, seed = 20260818 } = {}) {
     run(`mix#${k}`, st);
   }
 
+  // Once per grid, in the uniform state each grid is for.
+  set(ents.map(() => 'all'));
+  const detail = composition('detail');
+  set(ents.map(() => 'keys'));
+  const compact = composition('compact');
+
   set(ents.map(() => 'model'));
   const statesTested = 3 + 3 * ents.length * 3 + mixes;
   return { boxes: ents.length, edges: document.querySelectorAll('.edge').length,
-           statesTested, sizes, failures };
+           statesTested, sizes, failures,
+           warnings: [...detail.warn, ...compact.warn],
+           lattice: { detail: { columns: detail.columns, rows: detail.rows },
+                      compact: { columns: compact.columns, rows: compact.rows } } };
 }
 
 verifyErd();
