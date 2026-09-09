@@ -47,17 +47,18 @@ the only source of truth.
 
 ## Folder convention
 
-The diagram lives beside the data model it renders, at the next free number:
+The diagram lives beside the data model it renders, sharing its number:
 
 ```
 docs/<dated-folder>/
   04-prd.md
   06-data-model.md   <- the input
-  07-erd.html        <- next free number; this skill's output
+  06-erd.html        <- same number; this skill's output
 ```
 
-**A new number is for a new model. A correction goes back into the file it corrects** —
-redrawing the same model overwrites the same file rather than adding a new one.
+It's a view of the data model, not new material, so it doesn't take the next free number the
+way a new document would. **A correction goes back into the file it corrects** — redrawing
+the same model overwrites the same file rather than adding a new one.
 
 ## Install
 
